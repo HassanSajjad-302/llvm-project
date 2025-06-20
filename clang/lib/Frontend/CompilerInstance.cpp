@@ -1857,6 +1857,25 @@ ModuleLoadResult CompilerInstance::findOrCompileModuleAndReadAST(
   if (M)
     checkConfigMacros(getPreprocessor(), M, ImportLoc);
 
+  if (getHeaderSearchOpts().NoScanIPC) {
+    if (!ipcManager) {
+      ipcManager = new N2978::IPCManagerCompiler(OutputFiles.begin()->Filename);
+    }
+    N2978::CTBModule mod;
+    mod.moduleName = ModuleName;
+    if (const auto &r = ipcManager->receiveBTCModule(std::move(mod)); r) {
+      auto &[requested, deps] = r.value();
+      HS.getHeaderSearchOpts().PrebuiltModuleFiles.emplace(std::move(ModuleName) ,std::move(requested.filePath));
+      for (const auto &[file, logicalName] : deps) {
+        HS.getHeaderSearchOpts().PrebuiltModuleFiles.emplace(std::move(logicalName) ,std::move(file.filePath));
+      }
+    }
+    else {
+      string errorMessage = r.error();
+      ModuleName = errorMessage;
+    }
+  }
+
   // Select the source and filename for loading the named module.
   std::string ModuleFilename;
   ModuleSource Source =
